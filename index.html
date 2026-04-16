@@ -1,0 +1,456 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>BuildRight — Quote Assistant</title>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+  :root{--bg:#0e0f0c;--surface:#161714;--surface2:#1e1f1c;
+    --border:rgba(255,255,255,.08);--border2:rgba(255,255,255,.14);
+    --gold:#c8a84b;--gold2:#e8c96a;--text:#f0ede6;--muted:#888880;--muted2:#5a5a54;
+    --accent:#3a6b4a;--accent2:#4e8e63;--user-bubble:#1e2820;--bot-bubble:#1a1b18;
+    --radius:12px;--radius-sm:8px}
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);
+       height:100vh;display:flex;flex-direction:column;overflow:hidden}
+
+  /* HEADER */
+  header{display:flex;align-items:center;justify-content:space-between;
+    padding:0 28px;height:60px;border-bottom:1px solid var(--border);
+    background:var(--surface);flex-shrink:0;z-index:10}
+  .logo{display:flex;align-items:center;gap:10px;font-family:'Syne',sans-serif;
+    font-weight:800;font-size:18px;letter-spacing:-.5px}
+  .logo-mark{width:32px;height:32px;background:var(--gold);border-radius:6px;
+    display:flex;align-items:center;justify-content:center}
+  .logo-mark svg{width:18px;height:18px;fill:#0e0f0c}
+  .header-right{display:flex;align-items:center;gap:12px}
+  .pill{display:flex;align-items:center;gap:6px;border-radius:20px;
+    padding:4px 12px;font-size:12px;font-weight:500;letter-spacing:.3px;transition:all .2s}
+  .pill.ok{background:rgba(74,142,99,.15);border:1px solid rgba(74,142,99,.3);color:var(--accent2)}
+  .pill.err{background:rgba(180,60,60,.15);border:1px solid rgba(180,60,60,.3);color:#d07070}
+  .pill.wait{background:rgba(200,168,75,.1);border:1px solid rgba(200,168,75,.25);color:var(--gold)}
+  .dot{width:6px;height:6px;border-radius:50%;background:currentColor;animation:pulse 2s infinite}
+  @keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
+  .tab-badge{background:var(--surface2);border:1px solid var(--border2);border-radius:6px;
+    padding:3px 10px;font-size:11px;color:var(--muted)}
+  .tab-badge b{color:var(--gold)}
+  .btn{background:none;border:1px solid var(--border2);color:var(--muted);
+    font-family:'DM Sans',sans-serif;font-size:13px;padding:6px 14px;
+    border-radius:var(--radius-sm);cursor:pointer;transition:all .15s}
+  .btn:hover{color:var(--text);background:var(--surface2)}
+
+  /* LAYOUT */
+  main{display:flex;flex:1;overflow:hidden}
+
+  /* SIDEBAR */
+  aside{width:268px;flex-shrink:0;background:var(--surface);
+    border-right:1px solid var(--border);display:flex;flex-direction:column;
+    overflow-y:auto;padding:18px 14px;gap:6px}
+  aside::-webkit-scrollbar{width:4px}
+  aside::-webkit-scrollbar-thumb{background:var(--surface2);border-radius:2px}
+  .stitle{font-family:'Syne',sans-serif;font-size:10px;font-weight:700;
+    letter-spacing:1.5px;text-transform:uppercase;color:var(--muted2);padding:4px 8px 10px}
+  .qbtn{background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius-sm);
+    padding:9px 11px;cursor:pointer;transition:all .15s;text-align:left;
+    color:var(--text);font-family:'DM Sans',sans-serif;width:100%}
+  .qbtn:hover{border-color:var(--gold);background:rgba(200,168,75,.06)}
+  .qbtn b{font-size:12px;font-weight:500;display:block;margin-bottom:2px}
+  .qbtn small{font-size:11px;color:var(--muted);display:block}
+  .sep{height:1px;background:var(--border);margin:6px 0}
+  .tbox{background:rgba(200,168,75,.07);border:1px solid rgba(200,168,75,.2);
+    border-radius:var(--radius-sm);padding:11px}
+  .tbox .th{font-size:10px;font-weight:600;color:var(--gold);letter-spacing:.5px;
+    margin-bottom:5px;font-family:'Syne',sans-serif}
+  .tbox p{font-size:11px;color:var(--muted);line-height:1.6}
+  .gbox{background:rgba(78,142,99,.07);border:1px solid rgba(78,142,99,.2);
+    border-radius:var(--radius-sm);padding:11px}
+  .gbox .gh{font-size:10px;font-weight:600;color:var(--accent2);letter-spacing:.5px;
+    margin-bottom:6px;font-family:'Syne',sans-serif}
+  .ginput{width:100%;background:var(--bg);border:1px solid var(--border2);
+    border-radius:6px;padding:6px 10px;color:var(--text);font-size:11px;
+    font-family:'DM Sans',sans-serif;outline:none;margin-bottom:6px}
+  .ginput:focus{border-color:rgba(78,142,99,.5)}
+  .ginput::placeholder{color:var(--muted2)}
+  .gsave{width:100%;background:var(--accent);border:none;color:#d8f0e0;
+    font-family:'DM Sans',sans-serif;font-size:12px;font-weight:500;
+    padding:6px;border-radius:6px;cursor:pointer;transition:all .15s}
+  .gsave:hover{background:var(--accent2)}
+
+  /* CHAT */
+  .chat-wrap{flex:1;display:flex;flex-direction:column;overflow:hidden}
+  #msgs{flex:1;overflow-y:auto;padding:24px 28px;display:flex;
+    flex-direction:column;gap:18px;scroll-behavior:smooth}
+  #msgs::-webkit-scrollbar{width:5px}
+  #msgs::-webkit-scrollbar-thumb{background:var(--surface2);border-radius:3px}
+  .msg{display:flex;gap:12px;max-width:880px;animation:up .2s ease}
+  @keyframes up{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+  .msg.u{align-self:flex-end;flex-direction:row-reverse}
+  .msg.b{align-self:flex-start}
+  .av{width:32px;height:32px;border-radius:8px;flex-shrink:0;
+    display:flex;align-items:center;justify-content:center;
+    font-size:11px;font-weight:700;font-family:'Syne',sans-serif;margin-top:2px}
+  .msg.u .av{background:var(--gold);color:#0e0f0c}
+  .msg.b .av{background:var(--accent);color:#d8f0e0}
+  .bub{border-radius:var(--radius);padding:13px 16px;font-size:14px;
+    line-height:1.75;max-width:720px}
+  .msg.u .bub{background:var(--user-bubble);border:1px solid rgba(200,168,75,.2);
+    border-bottom-right-radius:3px}
+  .msg.b .bub{background:var(--bot-bubble);border:1px solid var(--border2);
+    border-bottom-left-radius:3px}
+  .bub h3{font-family:'Syne',sans-serif;font-size:12px;font-weight:700;color:var(--gold);
+    text-transform:uppercase;letter-spacing:.8px;margin:14px 0 7px}
+  .bub h3:first-child{margin-top:0}
+  .bub p{margin-bottom:9px}.bub p:last-child{margin-bottom:0}
+  .bub ul,.bub ol{padding-left:17px;margin-bottom:9px}
+  .bub li{margin-bottom:4px}
+  .bub strong{color:var(--gold2);font-weight:500}
+  .bub hr{border:none;border-top:1px solid var(--border);margin:12px 0}
+  .bub em{color:var(--muted);font-style:italic}
+  .bub code{background:var(--surface2);border:1px solid var(--border);
+    border-radius:4px;padding:1px 5px;font-size:12px;font-family:monospace}
+
+  /* quote table */
+  .qt{width:100%;border-collapse:collapse;margin:10px 0;font-size:13px}
+  .qt th{background:rgba(200,168,75,.12);color:var(--gold);font-family:'Syne',sans-serif;
+    font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.8px;
+    padding:7px 10px;text-align:left;border-bottom:1px solid rgba(200,168,75,.2)}
+  .qt td{padding:7px 10px;border-bottom:1px solid var(--border);vertical-align:top}
+  .qt tr:last-child td{border-bottom:none}
+  .qt .tr td{background:rgba(74,142,99,.1);font-weight:500;color:var(--accent2);
+    border-top:1px solid rgba(74,142,99,.3)}
+  .qt .gr td{background:rgba(74,142,99,.2);font-weight:600;color:#7de0a0;
+    font-size:14px;border-top:2px solid rgba(74,142,99,.5)}
+  .qt td:last-child,.qt th:last-child{text-align:right;font-variant-numeric:tabular-nums}
+
+  .live-badge{display:inline-flex;align-items:center;gap:5px;
+    background:rgba(74,142,99,.12);border:1px solid rgba(74,142,99,.25);
+    border-radius:4px;padding:2px 8px;font-size:10px;color:var(--accent2);
+    margin-bottom:10px;font-family:'Syne',sans-serif;font-weight:600;letter-spacing:.4px}
+  .live-badge::before{content:"";width:6px;height:6px;border-radius:50%;
+    background:var(--accent2);display:inline-block}
+
+  /* typing */
+  .typing{display:flex;align-items:center;gap:4px;padding:13px 16px;
+    background:var(--bot-bubble);border:1px solid var(--border2);
+    border-radius:var(--radius);border-bottom-left-radius:3px;width:fit-content}
+  .td{width:7px;height:7px;border-radius:50%;background:var(--muted2);animation:b 1.2s infinite}
+  .td:nth-child(2){animation-delay:.2s}.td:nth-child(3){animation-delay:.4s}
+  @keyframes b{0%,60%,100%{transform:translateY(0)}30%{transform:translateY(-5px);background:var(--gold)}}
+
+  /* input */
+  .input-area{padding:14px 28px 18px;background:var(--bg);
+    border-top:1px solid var(--border);flex-shrink:0}
+  .input-wrap{display:flex;align-items:flex-end;gap:10px;background:var(--surface);
+    border:1px solid var(--border2);border-radius:var(--radius);
+    padding:9px 12px;transition:border-color .15s}
+  .input-wrap:focus-within{border-color:rgba(200,168,75,.5);box-shadow:0 0 0 3px rgba(200,168,75,.07)}
+  #inp{flex:1;background:none;border:none;outline:none;color:var(--text);
+    font-family:'DM Sans',sans-serif;font-size:14px;line-height:1.5;
+    resize:none;max-height:120px;min-height:24px;padding:0;overflow-y:auto}
+  #inp::placeholder{color:var(--muted2)}
+  #snd{width:34px;height:34px;border-radius:7px;background:var(--gold);border:none;
+    cursor:pointer;display:flex;align-items:center;justify-content:center;
+    flex-shrink:0;transition:all .15s;color:#0e0f0c}
+  #snd:hover{background:var(--gold2);transform:scale(1.05)}
+  #snd:active{transform:scale(.96)}
+  #snd:disabled{background:var(--surface2);color:var(--muted2);cursor:not-allowed;transform:none}
+  #snd svg{width:15px;height:15px;fill:currentColor}
+  .hint{font-size:11px;color:var(--muted2);margin-top:6px;padding:0 2px;
+    display:flex;justify-content:space-between}
+
+  /* welcome */
+  .welcome{display:flex;flex-direction:column;align-items:center;justify-content:center;
+    height:100%;gap:18px;padding:40px;text-align:center}
+  .wicon{width:60px;height:60px;background:rgba(200,168,75,.12);
+    border:1px solid rgba(200,168,75,.25);border-radius:14px;
+    display:flex;align-items:center;justify-content:center}
+  .wicon svg{width:28px;height:28px;fill:var(--gold)}
+  .wtitle{font-family:'Syne',sans-serif;font-size:24px;font-weight:800;letter-spacing:-.5px}
+  .wsub{font-size:14px;color:var(--muted);max-width:420px;line-height:1.7}
+  .chips{display:flex;flex-wrap:wrap;gap:7px;justify-content:center;max-width:540px;margin-top:4px}
+  .chip{background:var(--surface2);border:1px solid var(--border2);border-radius:20px;
+    padding:7px 14px;font-size:12px;color:var(--text);cursor:pointer;transition:all .15s;
+    font-family:'DM Sans',sans-serif}
+  .chip:hover{background:rgba(200,168,75,.1);border-color:rgba(200,168,75,.35);color:var(--gold2)}
+  .warn-box{background:rgba(180,100,60,.12);border:1px solid rgba(180,100,60,.3);
+    border-radius:10px;padding:14px 18px;max-width:480px;font-size:13px;
+    color:#e0a888;line-height:1.7;text-align:left}
+  .warn-box strong{color:#f0c0a0;display:block;margin-bottom:6px;font-family:'Syne',sans-serif}
+  .warn-box code{background:rgba(0,0,0,.3);padding:2px 6px;border-radius:4px;
+    font-size:12px;color:#f5d5b8;font-family:monospace}
+</style>
+</head>
+<body>
+<header>
+  <div class="logo">
+    <div class="logo-mark">
+      <svg viewBox="0 0 24 24"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/>
+      <polyline points="9 22 9 12 15 12 15 22" style="fill:rgba(14,15,12,.35)"/></svg>
+    </div>
+    BuildRight
+  </div>
+  <div class="header-right">
+    <div id="tabBadge" class="tab-badge" style="display:none">Sheets: <b id="tabCount">—</b></div>
+    <div id="statusPill" class="pill wait"><div class="dot"></div><span id="statusTxt">Connecting…</span></div>
+    <button class="btn" onclick="clearChat()">New Quote</button>
+  </div>
+</header>
+
+<main>
+  <aside>
+    <div class="stitle">Quick Quotes</div>
+    <button class="qbtn" onclick="sq('Quote a full kitchen renovation: 200 sq ft, mid-range finishes, quartz countertops, semi-custom painted shaker cabinets, engineered hardwood flooring, new lighting and plumbing.')">
+      <b>Kitchen Reno</b><small>Full kitchen build-out</small></button>
+    <button class="qbtn" onclick="sq('Full bathroom renovation: 50 sq ft, porcelain tile, new vanity with quartz top, comfort-height toilet, frameless glass shower, all labour.')">
+      <b>Bathroom Reno</b><small>Full bath remodel</small></button>
+    <button class="qbtn" onclick="sq('Basement finish: 900 sq ft, LVP flooring, drywall, pot lights, one bathroom rough-in, egress window, perimeter framing and insulation. Mid-range.')">
+      <b>Basement Finish</b><small>Full basement build-out</small></button>
+    <button class="qbtn" onclick="sq('Replace all flooring in a 1,500 sq ft home: engineered hardwood in living areas, LVP in bathrooms and laundry. Include removal.')">
+      <b>Full-Home Flooring</b><small>Complete floor replacement</small></button>
+    <button class="qbtn" onclick="sq('Interior painting for a 2,000 sq ft two-storey home: walls, ceilings, and trim. Mid-grade paint. Include primer.')">
+      <b>Interior Painting</b><small>Full home paint job</small></button>
+    <button class="qbtn" onclick="sq('20x12 ft composite deck with aluminum railing, two stair runs, concrete footings, one exterior outlet. Include labour and permit.')">
+      <b>Deck Build</b><small>Composite deck + railing</small></button>
+    <button class="qbtn" onclick="sq('Master bedroom renovation: 240 sq ft, premium LVP flooring, walk-in closet organizer, paint, 6 pot lights, new baseboard and trim.')">
+      <b>Master Bedroom</b><small>Bedroom renovation</small></button>
+    <button class="qbtn" onclick="sq('Full home renovation for a 2,000 sq ft house: kitchen, 2 bathrooms, all flooring, full repaint, electrical and plumbing updates. Mid-to-premium. Include all permits.')">
+      <b>Full Home Reno</b><small>Complete home renovation</small></button>
+
+    <div class="sep"></div>
+
+    <div class="gbox">
+      <div class="gh">🔑 API Key Override</div>
+      <input class="ginput" id="keyIn" type="password" placeholder="sk-ant-… (optional)" autocomplete="off">
+      <button class="gsave" onclick="saveKey()">Save for Session</button>
+    </div>
+
+    <div class="tbox" style="margin-top:6px">
+      <div class="th">💡 Best Results</div>
+      <p>Include: room size, finish grade (budget / mid / premium), specific materials, and any special requirements.</p>
+    </div>
+    <div class="tbox" style="background:rgba(74,142,99,.07);border-color:rgba(74,142,99,.2)">
+      <div class="th" style="color:var(--accent2)">📊 Live Google Sheet</div>
+      <p>Every answer reads your Google Sheet fresh. Update prices anytime — the very next question reflects the change automatically.</p>
+    </div>
+  </aside>
+
+  <div class="chat-wrap">
+    <div id="msgs">
+      <div class="welcome" id="welcome">
+        <div class="wicon">
+          <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/>
+          <polyline points="14 2 14 8 20 8" style="fill:rgba(14,15,12,.3)"/>
+          <line x1="16" y1="13" x2="8" y2="13" style="stroke:#0e0f0c;stroke-width:1.5;fill:none"/>
+          <line x1="16" y1="17" x2="8" y2="17" style="stroke:#0e0f0c;stroke-width:1.5;fill:none"/>
+          </svg>
+        </div>
+        <div class="wtitle">Quote Assistant</div>
+        <div class="wsub">Prices read live from your Google Sheet every time you ask. Update prices anywhere, anytime — the next quote reflects it instantly.</div>
+        <div id="wStatus"></div>
+        <div class="chips">
+          <div class="chip" onclick="sq('What info do you need from me to build an accurate quote?')">What do you need from me?</div>
+          <div class="chip" onclick="sq('List all countertop options with low, mid and high price ranges.')">All countertop prices</div>
+          <div class="chip" onclick="sq('Compare engineered hardwood vs LVP flooring — prices, pros and cons.')">Hardwood vs LVP</div>
+          <div class="chip" onclick="sq('What flooring options are under $6/sq ft fully installed?')">Budget flooring options</div>
+        </div>
+      </div>
+    </div>
+    <div class="input-area">
+      <div class="input-wrap">
+        <textarea id="inp" placeholder="Describe the job — dimensions, materials, finish grade…"
+          rows="1" onkeydown="hk(event)" oninput="ar(this)"></textarea>
+        <button id="snd" onclick="send()">
+          <svg viewBox="0 0 24 24">
+            <line x1="22" y1="2" x2="11" y2="13" style="stroke:currentColor;stroke-width:2;fill:none"/>
+            <polygon points="22 2 15 22 11 13 2 9 22 2"/>
+          </svg>
+        </button>
+      </div>
+      <div class="hint">
+        <span>Enter to send &nbsp;·&nbsp; Shift+Enter for new line</span>
+        <span id="cc"></span>
+      </div>
+    </div>
+  </div>
+</main>
+
+<script>
+// Use relative URLs — works on localhost AND on any cloud domain
+const API = '';
+let conv = [], busy = false, sessKey = '';
+
+(async()=>{ await checkStatus(); })();
+
+async function checkStatus(){
+  const p=document.getElementById('statusPill'), t=document.getElementById('statusTxt');
+  p.className='pill wait'; t.textContent='Connecting…';
+  try{
+    const r=await fetch(`${API}/api/status`,{signal:AbortSignal.timeout(8000)});
+    const d=await r.json();
+    if(!d.api_key_set){
+      p.className='pill err'; t.textContent='API key missing';
+      warn('API key not set','Set <code>ANTHROPIC_API_KEY</code> in your Render environment variables, then redeploy.'); return;
+    }
+    if(!d.sheet_id_set){
+      p.className='pill err'; t.textContent='Sheet ID missing';
+      warn('Google Sheet not connected','Set <code>GOOGLE_SHEET_ID</code> in your Render environment variables.'); return;
+    }
+    p.className='pill ok'; t.textContent='Live — Google Sheet connected';
+    // Get tab count
+    try{
+      const sr=await fetch(`${API}/api/sheet-info`);
+      const sd=await sr.json();
+      if(sd.count){
+        document.getElementById('tabBadge').style.display='';
+        document.getElementById('tabCount').textContent=sd.count;
+      }
+    }catch{}
+  }catch(e){
+    p.className='pill err'; t.textContent='Server error';
+    warn('Connection failed', e.message||'Unknown error');
+  }
+}
+
+function warn(title,html){
+  const el=document.getElementById('wStatus');
+  if(el) el.innerHTML=`<div class="warn-box"><strong>${title}</strong>${html}</div>`;
+}
+
+function saveKey(){
+  const k=document.getElementById('keyIn').value.trim();
+  if(k){sessKey=k;document.getElementById('keyIn').value='';alert('Saved for this session.');}
+}
+
+function ar(el){
+  el.style.height='auto'; el.style.height=Math.min(el.scrollHeight,120)+'px';
+  const n=el.value.length; document.getElementById('cc').textContent=n>80?n+' chars':'';
+}
+
+function hk(e){ if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();send();} }
+
+function sq(t){ document.getElementById('inp').value=t; send(); }
+
+function clearChat(){
+  conv=[];
+  document.getElementById('msgs').innerHTML=`
+    <div class="welcome" id="welcome">
+      <div class="wicon"><svg viewBox="0 0 24 24">
+        <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/>
+        <polyline points="14 2 14 8 20 8" style="fill:rgba(14,15,12,.3)"/></svg></div>
+      <div class="wtitle">Quote Assistant</div>
+      <div class="wsub">Live prices from your Google Sheet on every query.</div>
+      <div class="chips">
+        <div class="chip" onclick="sq('List all countertop options with price ranges.')">Countertop prices</div>
+        <div class="chip" onclick="sq('Compare engineered hardwood vs LVP.')">Hardwood vs LVP</div>
+        <div class="chip" onclick="sq('Quote a mid-range 180 sq ft kitchen reno.')">Kitchen quote</div>
+      </div>
+    </div>`;
+}
+
+async function send(){
+  const input=document.getElementById('inp');
+  const text=input.value.trim();
+  if(!text||busy) return;
+  document.getElementById('welcome')?.remove();
+  input.value=''; input.style.height='auto';
+  document.getElementById('cc').textContent='';
+  addMsg('u',text); conv.push({role:'user',content:text});
+  setLoading(true); const tid=showTyping();
+  try{
+    const body={messages:conv};
+    if(sessKey) body.api_key=sessKey;
+    const r=await fetch(`${API}/api/chat`,{
+      method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify(body),signal:AbortSignal.timeout(120000)
+    });
+    const data=await r.json(); removeTyping(tid);
+    if(data.error) throw new Error(data.error);
+    conv.push({role:'assistant',content:data.reply});
+    addMsg('b',data.reply,data.sheet_loaded);
+  }catch(e){
+    removeTyping(tid);
+    addMsg('b',e.name==='TimeoutError'?'Request timed out. Try a more specific question.':
+      `Error: ${e.message}`);
+  }
+  setLoading(false);
+}
+
+function addMsg(role,text,live){
+  const msgs=document.getElementById('msgs');
+  const div=document.createElement('div'); div.className=`msg ${role}`;
+  const av=document.createElement('div'); av.className='av';
+  av.textContent=role==='u'?'YOU':'AI';
+  const bub=document.createElement('div'); bub.className='bub';
+  bub.innerHTML=(role==='b'&&live?'<div class="live-badge">LIVE SHEET DATA</div>':'')+render(text);
+  div.appendChild(av); div.appendChild(bub);
+  msgs.appendChild(div); msgs.scrollTop=msgs.scrollHeight;
+}
+
+function render(t){
+  return (t.match(/\|/g)||[]).length>4 ? parseMd(t) : fmt(t);
+}
+
+function fmt(t){
+  return t.replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>')
+    .replace(/\*(.+?)\*/g,'<em>$1</em>')
+    .replace(/`(.+?)`/g,'<code>$1</code>')
+    .replace(/^#{1,3} (.+)$/gm,'<h3>$1</h3>')
+    .replace(/^---+$/gm,'<hr>')
+    .replace(/^[-•*] (.+)$/gm,'<li>$1</li>')
+    .replace(/(<li>[\s\S]*?<\/li>)+/g,m=>`<ul>${m}</ul>`)
+    .replace(/\n\n+/g,'</p><p>').replace(/\n/g,'<br>');
+}
+
+function parseMd(text){
+  const lines=text.split('\n'); let out='',tl=[],nl=[];
+  const fT=()=>{if(tl.length){out+=mkTable(tl);tl=[];}};
+  const fN=()=>{if(nl.length){out+=fmt(nl.join('\n'));nl=[];}};
+  for(const l of lines){
+    if(l.trim().startsWith('|')){fN();tl.push(l);}
+    else{fT();nl.push(l);}
+  }
+  fT();fN(); return out;
+}
+
+function mkTable(lines){
+  const rows=lines.filter(l=>!/^\|[-\s|]+\|$/.test(l.trim()));
+  if(!rows.length) return '';
+  let h='<table class="qt">';
+  rows.forEach((row,i)=>{
+    const cells=row.split('|').slice(1,-1);
+    if(i===0){
+      h+='<thead><tr>'+cells.map(c=>`<th>${c.trim()}</th>`).join('')+'</tr></thead><tbody>';
+    }else{
+      const up=cells.map(c=>c.trim()).join(' ').toUpperCase();
+      const isG=up.includes('GRAND');
+      const isS=!isG&&(up.includes('TOTAL')||up.includes('HST')||up.includes('OVERHEAD')||up.includes('CONTINGENCY')||up.includes('SUBTOTAL'));
+      h+=`<tr class="${isG?'gr':isS?'tr':''}">`;
+      h+=cells.map(c=>`<td>${c.trim().replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>')}</td>`).join('');
+      h+='</tr>';
+    }
+  });
+  return h+'</tbody></table>';
+}
+
+function showTyping(){
+  const msgs=document.getElementById('msgs'), id='ty-'+Date.now();
+  const div=document.createElement('div'); div.className='msg b'; div.id=id;
+  const av=document.createElement('div'); av.className='av'; av.textContent='AI';
+  const ind=document.createElement('div'); ind.className='typing';
+  ind.innerHTML='<div class="td"></div><div class="td"></div><div class="td"></div>';
+  div.appendChild(av); div.appendChild(ind);
+  msgs.appendChild(div); msgs.scrollTop=msgs.scrollHeight;
+  return id;
+}
+
+function removeTyping(id){ document.getElementById(id)?.remove(); }
+
+function setLoading(v){
+  busy=v;
+  document.getElementById('snd').disabled=v;
+  document.getElementById('inp').disabled=v;
+}
+</script>
+</body>
+</html>
