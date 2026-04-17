@@ -28,13 +28,55 @@ PORT              = int(os.environ.get("PORT", 5050))
 #  No API key needed — sheet just needs to be shared as "Anyone can view".
 # ══════════════════════════════════════════════════════════════════════════════
  
+import re, urllib.parse
+ 
 HEADERS = {
     "User-Agent": "Mozilla/5.0 (compatible; BuildRight/1.0)",
 }
  
+# Fallback sheet names matching the Renovation_Materials_Reference.xlsx tabs
+KNOWN_SHEET_NAMES = [
+    "🪵 Flooring",
+    "🧱 Tile & Wall",
+    "🍳 Countertops",
+    "🎨 Paint & Finishes",
+    "🚪 Cabinetry & Millwork",
+    "🚿 Plumbing Fixtures",
+    "🏗️ Structure & Insulation",
+    "📋 Project Quote",
+]
  
-def fetch_csv_from_url(url: str) -> list[list[str]]:
-    """Fetch a CSV URL and return as a list of rows, skipping blank rows."""
+ 
+def get_sheet_names(sheet_id: str) -> list[str]:
+    """
+    Try to auto-detect sheet tab names from the published HTML page.
+    Falls back to the known sheet names from the user's spreadsheet.
+    """
+    try:
+        url = f"https://docs.google.com/spreadsheets/d/{sheet_id}/pubhtml"
+        req = urllib.request.Request(url, headers=HEADERS)
+        with urllib.request.urlopen(req, timeout=10) as resp:
+            html = resp.read().decode("utf-8", errors="replace")
+        names = re.findall(r'<li[^>]*>\s*<a[^>]*>([^<]+)</a>', html)
+        names = [n.strip() for n in names if n.strip()]
+        if len(names) >= 2:
+            return names
+    except Exception:
+        pass
+    return KNOWN_SHEET_NAMES
+ 
+ 
+def fetch_sheet_by_name(sheet_id: str, sheet_name: str) -> list[list[str]]:
+    """
+    Fetch one sheet tab using the gviz/tq endpoint.
+    This works for ANY sheet shared as 'Anyone with the link can view'
+    — no API key, no OAuth, no 'Publish to web' required.
+    """
+    encoded = urllib.parse.quote(sheet_name)
+    url = (
+        f"https://docs.google.com/spreadsheets/d/{sheet_id}"
+        f"/gviz/tq?tqx=out:csv&sheet={encoded}"
+    )
     req = urllib.request.Request(url, headers=HEADERS)
     with urllib.request.urlopen(req, timeout=20) as resp:
         raw = resp.read().decode("utf-8", errors="replace")
@@ -46,65 +88,28 @@ def fetch_csv_from_url(url: str) -> list[list[str]]:
     return rows
  
  
-def get_sheet_tabs(sheet_id: str) -> list[dict]:
-    """
-    Get all tab names and GIDs from the publicly published HTML page.
-    This works for any sheet with 'Publish to web' enabled — no login needed.
-    Falls back to a single default tab if parsing fails.
-    """
-    import re
-    url = f"https://docs.google.com/spreadsheets/d/{sheet_id}/pubhtml"
-    try:
-        req = urllib.request.Request(url, headers=HEADERS)
-        with urllib.request.urlopen(req, timeout=15) as resp:
-            html = resp.read().decode("utf-8", errors="replace")
-        # pubhtml contains links like: gid=123456789
-        gid_title = re.findall(r'gid=(\d+)[^"]*"[^>]*>([^<]+)</a>', html)
-        if gid_title:
-            seen = set()
-            tabs = []
-            for gid, title in gid_title:
-                title = title.strip()
-                if gid not in seen and title:
-                    seen.add(gid)
-                    tabs.append({"gid": gid, "title": title})
-            if tabs:
-                return tabs
-    except Exception:
-        pass
-    return [{"gid": "0", "title": "Sheet1"}]
- 
- 
 def load_google_sheet_data(sheet_id: str) -> str:
     """
-    Downloads all tabs from the published Google Sheet and returns
-    structured text for the AI to reason over.
-    Uses /pub?output=csv which works for 'Publish to web' sheets.
+    Downloads all tabs from the Google Sheet and returns structured
+    text for the AI. Uses gviz/tq — works for any publicly shared sheet.
     """
     if not sheet_id:
         return "[ERROR: GOOGLE_SHEET_ID not set in Render environment variables.]"
  
-    try:
-        tabs = get_sheet_tabs(sheet_id)
-    except Exception as e:
-        return f"[ERROR fetching sheet tabs: {e}]"
- 
+    sheet_names = get_sheet_names(sheet_id)
     sections = []
-    for tab in tabs:
-        gid   = tab["gid"]
-        title = tab["title"]
+ 
+    for name in sheet_names:
         try:
-            # Use /pub?output=csv — works for "Publish to web" sheets, no auth needed
-            url = f"https://docs.google.com/spreadsheets/d/{sheet_id}/pub?gid={gid}&single=true&output=csv"
-            rows = fetch_csv_from_url(url)
+            rows = fetch_sheet_by_name(sheet_id, name)
         except Exception as e:
-            sections.append(f"\n=== SHEET: {title} ===\n[Could not load: {e}]")
+            sections.append(f"\n=== SHEET: {name} ===\n[Could not load: {e}]")
             continue
  
         if not rows:
             continue
  
-        lines = [f"\n=== SHEET: {title} ==="]
+        lines = [f"\n=== SHEET: {name} ==="]
         for row in rows:
             while row and row[-1] == "":
                 row.pop()
@@ -196,8 +201,8 @@ def sheet_info():
     if not GOOGLE_SHEET_ID:
         return jsonify({"error": "GOOGLE_SHEET_ID not set"}), 400
     try:
-        tabs = get_sheet_tabs(GOOGLE_SHEET_ID)
-        return jsonify({"tabs": tabs, "count": len(tabs)})
+        names = get_sheet_names(GOOGLE_SHEET_ID)
+        return jsonify({"tabs": [{"title": n} for n in names], "count": len(names)})
     except Exception as e:
         return jsonify({"error": str(e)}), 500
  
