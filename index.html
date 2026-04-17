@@ -20,16 +20,18 @@
   --input-h:60px;
 }
 *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
-html{height:100%}
+html,body{height:100%;margin:0;padding:0}
 body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);
   display:flex;flex-direction:column;
   height:100vh;
-  height:calc(var(--vh, 1vh) * 100);
-  overflow:hidden;}
+  height:100dvh;
+  overflow:hidden;
+  overscroll-behavior:none;}
  
 /* ── HEADER ─────────────────────────────────────────────────── */
 header{
-  height:var(--header-h);flex-shrink:0;
+  flex:0 0 var(--header-h);
+  height:var(--header-h);
   background:var(--surface);border-bottom:1px solid var(--border);
   display:flex;align-items:center;justify-content:space-between;
   padding:0 16px;position:relative;z-index:100;
@@ -174,19 +176,23 @@ aside.open{transform:translateX(0)}
  
 /* ── CHAT AREA ──────────────────────────────────────────────── */
 .chat-wrap{
-  flex:1;display:flex;flex-direction:column;
-  overflow:hidden;min-height:0;
-  margin-left:0;transition:margin-left .28s cubic-bezier(.4,0,.2,1);
+  flex:1 1 0;display:flex;flex-direction:column;
+  overflow:hidden;
+  min-height:0;
+  min-width:0;
+  margin-left:0;
+  transition:margin-left .28s cubic-bezier(.4,0,.2,1);
 }
 #msgs{
-  flex:1;
-  overflow-y:scroll;
+  flex:1 1 0;
+  overflow-y:auto;
   overflow-x:hidden;
   -webkit-overflow-scrolling:touch;
   overscroll-behavior:contain;
-  padding:20px 16px;
+  padding:20px 16px 24px;
   display:flex;flex-direction:column;gap:16px;
   min-height:0;
+  min-width:0;
 }
 #msgs::-webkit-scrollbar{width:4px}
 #msgs::-webkit-scrollbar-thumb{background:var(--surface2);border-radius:2px}
@@ -205,7 +211,12 @@ aside.open{transform:translateX(0)}
 .msg.b .av{background:var(--accent);color:#d8f0e0}
 .bub{
   border-radius:var(--radius);padding:12px 15px;font-size:14px;
-  line-height:1.75;max-width:min(680px,calc(100vw - 80px));word-break:break-word;
+  line-height:1.75;
+  max-width:min(680px,calc(100vw - 80px));
+  min-width:0;
+  overflow:hidden;
+  word-break:break-word;
+  overflow-wrap:anywhere;
 }
 .msg.u .bub{background:var(--user-bubble);border:1px solid rgba(200,168,75,.18);
   border-bottom-right-radius:3px;color:var(--text)}
@@ -224,8 +235,20 @@ aside.open{transform:translateX(0)}
   border-radius:4px;padding:1px 5px;font-size:12px;font-family:monospace}
  
 /* overflow table wrapper for mobile */
-.tbl-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch;margin:10px 0;border-radius:8px}
-.qt{width:100%;border-collapse:collapse;font-size:13px;min-width:440px}
+.tbl-wrap{
+  max-width:100%;
+  overflow-x:auto;
+  -webkit-overflow-scrolling:touch;
+  margin:10px 0;
+  border-radius:8px;
+  -webkit-mask-image:linear-gradient(to right, black calc(100% - 20px), transparent);
+}
+.qt{
+  width:100%;
+  border-collapse:collapse;
+  font-size:13px;
+  min-width:440px;
+}
 .qt th{background:rgba(200,168,75,.12);color:var(--gold);font-family:'Syne',sans-serif;
   font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.7px;
   padding:7px 10px;text-align:left;border-bottom:1px solid rgba(200,168,75,.2)}
@@ -255,8 +278,11 @@ aside.open{transform:translateX(0)}
  
 /* ── INPUT AREA ─────────────────────────────────────────────── */
 .input-area{
-  flex-shrink:0;background:var(--bg);border-top:1px solid var(--border);
+  flex:0 0 auto;
+  background:var(--bg);
+  border-top:1px solid var(--border);
   padding:10px 14px 12px;
+  padding-bottom:calc(12px + env(safe-area-inset-bottom, 0px));
 }
 .input-wrap{
   display:flex;align-items:flex-end;gap:9px;background:var(--surface);
@@ -310,7 +336,7 @@ aside.open{transform:translateX(0)}
   aside.open{transform:none}
   #overlay{display:none !important}
   .chat-wrap{margin-left:0}
-  main{display:flex;flex:1;overflow:hidden;min-height:0;position:relative;}
+  main{display:flex;flex:1 1 0;overflow:hidden;min-height:0;min-width:0;position:relative;}
   .icon-btn.menu-toggle{display:none}
   .hint .desk{display:block}
 }
@@ -639,6 +665,9 @@ async function send() {
   const text  = input.value.trim();
   if (!text || busy) return;
  
+  // Dismiss mobile keyboard immediately so the response is visible
+  input.blur();
+ 
   document.getElementById('welcome')?.remove();
   input.value = '';
   input.style.height = 'auto';
@@ -917,26 +946,9 @@ if (window.innerWidth >= 900) {
   sidebarOpen = true;
 }
  
-// ── Mobile viewport height fix ─────────────────────────────────
-// Sets --vh to the real inner height so the layout never gets
-// clipped by the iOS address bar or Android keyboard.
-function setVh() {
-  const vh = window.innerHeight * 0.01;
-  document.documentElement.style.setProperty('--vh', vh + 'px');
-  document.body.style.height = window.innerHeight + 'px';
-}
-setVh();
-window.addEventListener('resize', setVh);
-window.addEventListener('orientationchange', () => setTimeout(setVh, 300));
- 
-// When keyboard opens on mobile, scroll messages to bottom
-document.getElementById('inp').addEventListener('focus', () => {
-  setTimeout(() => {
-    setVh();
-    const msgs = document.getElementById('msgs');
-    msgs.scrollTop = msgs.scrollHeight;
-  }, 400);
-});
+// ── Mobile keyboard dismiss on send ────────────────────────────
+// When user taps send on mobile, blur the input so the keyboard
+// closes and the response is visible without needing to scroll.
 </script>
 </body>
 </html>
