@@ -20,11 +20,12 @@
   --input-h:60px;
 }
 *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
-html{height:100%;height:-webkit-fill-available;overflow:hidden}
+html{height:100%}
 body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);
   display:flex;flex-direction:column;
-  height:100vh;height:100dvh;height:-webkit-fill-available;
-  position:fixed;width:100%;top:0;left:0;overflow:hidden;}
+  height:100vh;
+  height:calc(var(--vh, 1vh) * 100);
+  overflow:hidden;}
  
 /* ── HEADER ─────────────────────────────────────────────────── */
 header{
@@ -173,15 +174,18 @@ aside.open{transform:translateX(0)}
  
 /* ── CHAT AREA ──────────────────────────────────────────────── */
 .chat-wrap{
-  flex:1;display:flex;flex-direction:column;overflow:hidden;
+  flex:1;display:flex;flex-direction:column;
+  overflow:hidden;min-height:0;
   margin-left:0;transition:margin-left .28s cubic-bezier(.4,0,.2,1);
-  min-height:0;
 }
 #msgs{
-  flex:1;overflow-y:auto;overflow-x:hidden;padding:20px 16px;
-  display:flex;flex-direction:column;gap:16px;scroll-behavior:smooth;
+  flex:1;
+  overflow-y:scroll;
+  overflow-x:hidden;
   -webkit-overflow-scrolling:touch;
-  overscroll-behavior-y:contain;
+  overscroll-behavior:contain;
+  padding:20px 16px;
+  display:flex;flex-direction:column;gap:16px;
   min-height:0;
 }
 #msgs::-webkit-scrollbar{width:4px}
@@ -306,7 +310,7 @@ aside.open{transform:translateX(0)}
   aside.open{transform:none}
   #overlay{display:none !important}
   .chat-wrap{margin-left:0}
-  main{display:flex;flex:1;overflow:hidden;min-height:0;}
+  main{display:flex;flex:1;overflow:hidden;min-height:0;position:relative;}
   .icon-btn.menu-toggle{display:none}
   .hint .desk{display:block}
 }
@@ -700,7 +704,12 @@ function addMsg(role, text, live) {
   div.appendChild(av);
   div.appendChild(bub);
   msgs.appendChild(div);
+  // Scroll immediately + again after paint for mobile
   msgs.scrollTop = msgs.scrollHeight;
+  requestAnimationFrame(() => {
+    msgs.scrollTop = msgs.scrollHeight;
+    setTimeout(() => { msgs.scrollTop = msgs.scrollHeight; }, 100);
+  });
 }
  
 function render(t) {
@@ -763,7 +772,9 @@ function showTyping() {
   const ind = document.createElement('div'); ind.className = 'typing';
   ind.innerHTML = '<div class="td"></div><div class="td"></div><div class="td"></div>';
   div.appendChild(av); div.appendChild(ind);
-  msgs.appendChild(div); msgs.scrollTop = msgs.scrollHeight;
+  msgs.appendChild(div);
+  msgs.scrollTop = msgs.scrollHeight;
+  requestAnimationFrame(() => { msgs.scrollTop = msgs.scrollHeight; });
   return id;
 }
  
@@ -905,6 +916,27 @@ if (window.innerWidth >= 900) {
   document.getElementById('sidebar').classList.add('open');
   sidebarOpen = true;
 }
+ 
+// ── Mobile viewport height fix ─────────────────────────────────
+// Sets --vh to the real inner height so the layout never gets
+// clipped by the iOS address bar or Android keyboard.
+function setVh() {
+  const vh = window.innerHeight * 0.01;
+  document.documentElement.style.setProperty('--vh', vh + 'px');
+  document.body.style.height = window.innerHeight + 'px';
+}
+setVh();
+window.addEventListener('resize', setVh);
+window.addEventListener('orientationchange', () => setTimeout(setVh, 300));
+ 
+// When keyboard opens on mobile, scroll messages to bottom
+document.getElementById('inp').addEventListener('focus', () => {
+  setTimeout(() => {
+    setVh();
+    const msgs = document.getElementById('msgs');
+    msgs.scrollTop = msgs.scrollHeight;
+  }, 400);
+});
 </script>
 </body>
 </html>
