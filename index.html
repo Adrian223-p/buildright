@@ -344,6 +344,20 @@ aside.open{transform:translateX(0)}
   .hint .desk{display:none}
   .pill-text{display:none}
   .tab-badge-wrap{display:none}
+ 
+  /* More room for messages, slimmer input at bottom */
+  :root{--header-h:52px}
+  .input-area{
+    padding:6px 10px;
+    padding-bottom:calc(6px + env(safe-area-inset-bottom, 0px));
+  }
+  .input-wrap{
+    padding:6px 8px;
+    gap:7px;
+  }
+  .hint{display:none}
+  #inp{font-size:16px}  /* prevents iOS zoom on focus */
+  #msgs{padding:14px 12px 16px}
 }
 </style>
 </head>
