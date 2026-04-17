@@ -28,43 +28,48 @@ PORT              = int(os.environ.get("PORT", 5050))
 #  No API key needed — sheet just needs to be shared as "Anyone can view".
 # ══════════════════════════════════════════════════════════════════════════════
  
-def fetch_sheet_as_csv(sheet_id: str, gid: str = "0") -> list[list[str]]:
-    """Download one sheet tab as a list of rows."""
-    url = (
-        f"https://docs.google.com/spreadsheets/d/{sheet_id}"
-        f"/export?format=csv&gid={gid}"
-    )
-    req = urllib.request.Request(url, headers={"User-Agent": "BuildRight/1.0"})
-    with urllib.request.urlopen(req, timeout=15) as resp:
+HEADERS = {
+    "User-Agent": "Mozilla/5.0 (compatible; BuildRight/1.0)",
+}
+ 
+ 
+def fetch_csv_from_url(url: str) -> list[list[str]]:
+    """Fetch a CSV URL and return as a list of rows, skipping blank rows."""
+    req = urllib.request.Request(url, headers=HEADERS)
+    with urllib.request.urlopen(req, timeout=20) as resp:
         raw = resp.read().decode("utf-8", errors="replace")
-    reader = csv.reader(io.StringIO(raw))
     rows = []
-    for row in reader:
+    for row in csv.reader(io.StringIO(raw)):
         cleaned = [c.strip() for c in row]
-        if any(c for c in cleaned):          # skip fully blank rows
+        if any(cleaned):
             rows.append(cleaned)
     return rows
  
  
-def fetch_sheet_metadata(sheet_id: str) -> list[dict]:
+def get_sheet_tabs(sheet_id: str) -> list[dict]:
     """
-    Fetch the sheet's metadata JSON to get all tab names and their gids.
-    Uses the public /spreadsheets/d/{id}/edit URL which returns JSON we can parse.
-    Falls back to gid=0 only if metadata fetch fails.
+    Get all tab names and GIDs from the publicly published HTML page.
+    This works for any sheet with 'Publish to web' enabled — no login needed.
+    Falls back to a single default tab if parsing fails.
     """
-    url = f"https://docs.google.com/spreadsheets/d/{sheet_id}/edit"
-    req = urllib.request.Request(url, headers={"User-Agent": "BuildRight/1.0"})
+    import re
+    url = f"https://docs.google.com/spreadsheets/d/{sheet_id}/pubhtml"
     try:
+        req = urllib.request.Request(url, headers=HEADERS)
         with urllib.request.urlopen(req, timeout=15) as resp:
             html = resp.read().decode("utf-8", errors="replace")
- 
-        # Google embeds sheet metadata as JSON inside the page
-        import re
-        # Look for "sheets":[{"properties":{"sheetId":NNN,"title":"..."}...
-        pattern = r'"sheetId":(\d+),"title":"([^"]+)"'
-        matches = re.findall(pattern, html)
-        if matches:
-            return [{"gid": gid, "title": title} for gid, title in matches]
+        # pubhtml contains links like: gid=123456789
+        gid_title = re.findall(r'gid=(\d+)[^"]*"[^>]*>([^<]+)</a>', html)
+        if gid_title:
+            seen = set()
+            tabs = []
+            for gid, title in gid_title:
+                title = title.strip()
+                if gid not in seen and title:
+                    seen.add(gid)
+                    tabs.append({"gid": gid, "title": title})
+            if tabs:
+                return tabs
     except Exception:
         pass
     return [{"gid": "0", "title": "Sheet1"}]
@@ -72,24 +77,26 @@ def fetch_sheet_metadata(sheet_id: str) -> list[dict]:
  
 def load_google_sheet_data(sheet_id: str) -> str:
     """
-    Downloads all tabs from the Google Sheet and formats them
-    as structured text for the AI to reason over.
+    Downloads all tabs from the published Google Sheet and returns
+    structured text for the AI to reason over.
+    Uses /pub?output=csv which works for 'Publish to web' sheets.
     """
     if not sheet_id:
-        return "[ERROR: GOOGLE_SHEET_ID environment variable not set. " \
-               "Add it in your Render dashboard.]"
+        return "[ERROR: GOOGLE_SHEET_ID not set in Render environment variables.]"
  
     try:
-        tabs = fetch_sheet_metadata(sheet_id)
+        tabs = get_sheet_tabs(sheet_id)
     except Exception as e:
-        return f"[ERROR fetching sheet metadata: {e}]"
+        return f"[ERROR fetching sheet tabs: {e}]"
  
     sections = []
     for tab in tabs:
         gid   = tab["gid"]
         title = tab["title"]
         try:
-            rows = fetch_sheet_as_csv(sheet_id, gid)
+            # Use /pub?output=csv — works for "Publish to web" sheets, no auth needed
+            url = f"https://docs.google.com/spreadsheets/d/{sheet_id}/pub?gid={gid}&single=true&output=csv"
+            rows = fetch_csv_from_url(url)
         except Exception as e:
             sections.append(f"\n=== SHEET: {title} ===\n[Could not load: {e}]")
             continue
@@ -189,7 +196,7 @@ def sheet_info():
     if not GOOGLE_SHEET_ID:
         return jsonify({"error": "GOOGLE_SHEET_ID not set"}), 400
     try:
-        tabs = fetch_sheet_metadata(GOOGLE_SHEET_ID)
+        tabs = get_sheet_tabs(GOOGLE_SHEET_ID)
         return jsonify({"tabs": tabs, "count": len(tabs)})
     except Exception as e:
         return jsonify({"error": str(e)}), 500
